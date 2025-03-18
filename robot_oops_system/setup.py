@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
             'streamer = robot_oops_system.streamer:main',
             'semantic_segmentation_dl = robot_oops_system.semantic_segmentation_dl:main',
+            'object_tracker = robot_oops_system.object_tracker:main',
         ],
     },
 )

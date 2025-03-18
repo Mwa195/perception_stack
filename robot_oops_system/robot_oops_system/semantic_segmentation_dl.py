@@ -1,4 +1,4 @@
-#!/home/mwa/opencv_env/bin/python3
+#! /home/mwa/opencv_env/bin/python3
 
 import rclpy
 from rclpy.node import Node
@@ -112,10 +112,10 @@ class SegmentationNode(Node):
         for i in range(21):  # Loop over all classes
             colored_mask[mask == i] = colors[i]
         
-        detected_classes = set(mask.flatten()) 
-        for i in detected_classes:
-            if i > 0:  # Ignore background (0)
-                self.get_logger().info(f"Detected {classes_names[i]}/s")
+        # detected_classes = set(mask.flatten()) 
+        # for i in detected_classes:
+        #     if i > 0:  # Ignore background (0)
+        #         self.get_logger().info(f"Detected {classes_names[i]}/s")
                 
         return colored_mask
 
