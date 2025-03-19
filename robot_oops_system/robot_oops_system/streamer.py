@@ -1,3 +1,4 @@
+# Import Necessary Libraries
 import rclpy
 from rclpy.node import Node
 import cv2
@@ -5,35 +6,53 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
 class CameraStreamer(Node):
+    """
+    Camera Streamer Node which captures frames from the laptop's webcam
+    and publishes it to /camera_feed topic
+    """
     def __init__(self):
+        """
+        Initialize the camera_streamer node
+        """
         super().__init__('camera_streamer')
 
+        # Open Camera (ID: 0)
         self.cap = cv2.VideoCapture(0)
         if not self.cap.isOpened():
             self.get_logger().error("Camera didn't Open")
             return
         
-        self.feed_pub = self.create_publisher(Image, '/camera_feed', 10)
+        # Publisher
+        self.feed_pub = self.create_publisher(
+            Image,
+            '/camera_feed',
+            10
+            )
+        
+        # CV Bridge (Used to convert the frames into ROS2 msg *Image*)
         self.bridge = CvBridge()
 
+        # Main Timer which captures the frames with 30 FPS
         self.main_timer = self.create_timer(1/30, self.stream_video)
         
         self.get_logger().info("Camera Streamer Node has started.")
 
     def stream_video(self):
         """
-        Continuously captures and displays frames from the webcam
+        Continuously capture and display frames from the webcam
         """
+        # Read Frames from teh camera
         ret, frame = self.cap.read()
         if ret:
             cv2.imshow("Camera Feed", frame)
+            # COnvert frame to Image format
             ros_image = self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
-            self.feed_pub.publish(ros_image)
+            self.feed_pub.publish(ros_image) # Publish to the topic
         else:
             self.get_logger().warn("Failed to capture frame")
         
 
-        # Press 'q' to exit
+        # Use 'e' to exit
         if cv2.waitKey(1) & 0xFF == ord('e'):
             self.get_logger().info("Shutting down camera stream...")
             self.cap.release()
@@ -42,14 +61,14 @@ class CameraStreamer(Node):
         
 
 def main(args=None):
-    rclpy.init(args=args)
-    node = CameraStreamer()
+    rclpy.init(args=args) # Initialize ROS2
+    node = CameraStreamer() # Create Node as an instance of the Class
     try:
-        rclpy.spin(node)
+        rclpy.spin(node) # Keep the node spinning
     except KeyboardInterrupt:
         pass
     finally:
-        rclpy.shutdown()
+        rclpy.shutdown() # Shutdown the node gracefully
 
 if __name__ == '__main__':
     main()

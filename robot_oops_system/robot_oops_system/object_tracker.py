@@ -1,171 +1,3 @@
-# import rclpy
-# from rclpy.node import Node
-# import cv2
-# import numpy as np
-# from sensor_msgs.msg import Image
-# from cv_bridge import CvBridge
-# from my_interfaces_pkg.msg import TrackedObject, TrackedObjects
-# from ultralytics import YOLO
-# from deep_sort_realtime.deepsort_tracker import DeepSort
-
-# class ObjectTrackingNode(Node):
-#     def __init__(self):
-#         super().__init__("segmentation_node")
-
-#         self.feed_sub = self.create_subscription(Image, "/camera_feed", self.feed_callback, 10)
-#         self.mask_sub = self.create_subscription(Image, "/segmentation_mask", self.mask_callback, 10)
-#         # Publisher
-#         self.tracked_pub = self.create_publisher(TrackedObjects, "/tracked_objects", 10)
-
-#         # YOLO model for object detection
-#         self.model = YOLO("yolov8n.pt")
-#         # DeepSORT tracker
-#         self.tracker = DeepSort(max_age=30)
-#         # OpenCV Bridge
-#         self.bridge = CvBridge()
-#         # Store the latest segmentation mask
-#         self.latest_mask = None
-
-#         # Define Pascal VOC color map (21 classes)
-#         self.color_map = {
-#             "Background": [0, 0, 0],
-#             "Aeroplane": [128, 0, 0],
-#             "Bicycle": [0, 128, 0],
-#             "Bird": [128, 128, 0],
-#             "Boat": [0, 0, 128],
-#             "Bottle": [128, 0, 128],
-#             "Bus": [0, 128, 128],
-#             "Car": [128, 128, 128],
-#             "Cat": [64, 0, 0],
-#             "Chair": [192, 0, 0],
-#             "Cow": [64, 128, 0],
-#             "Dining Table": [192, 128, 0],
-#             "Dog": [64, 0, 128],
-#             "Horse": [192, 0, 128],
-#             "Motorbike": [64, 128, 128],
-#             "Person": [192, 128, 128],
-#             "Potted Plant": [0, 64, 0],
-#             "Sheep": [128, 64, 0],
-#             "Sofa": [0, 192, 0],
-#             "Train": [128, 192, 0],
-#             "Monitor": [0, 64, 128]
-#         }
-
-#         # Define the classes to track
-#         self.allowed_classes = {"Person", "Bottle", "Bus", "Car", "Chair"}
-
-#         self.get_logger().info("Object Tracking Node started.")
-
-
-#     def mask_callback(self, msg:Image):
-#         """
-#         Updates the segmentation mask whenever a new one is received.
-#         """
-#         self.latest_mask = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-
-#     def filter_mask_by_class(self):
-#         """Filters the segmentation mask based on allowed classes."""
-#         if self.latest_mask is None:
-#             return None  # Return None to avoid processing errors
-
-#         hsv_mask = cv2.cvtColor(self.latest_mask, cv2.COLOR_BGR2HSV)
-#         filtered_mask = np.zeros(hsv_mask.shape[:2], dtype=np.uint8)  # Ensure grayscale
-
-#         for class_name, color in self.color_map.items():
-#             if class_name in self.allowed_classes:
-#                 lower_bound = np.array(color) - 10
-#                 upper_bound = np.array(color) + 10
-#                 class_mask = cv2.inRange(hsv_mask, lower_bound, upper_bound)
-#                 filtered_mask = cv2.bitwise_or(filtered_mask, class_mask)
-
-#         # ✅ Ensure the mask is binary and the same size as frame
-#         filtered_mask = cv2.threshold(filtered_mask, 1, 255, cv2.THRESH_BINARY)[1]
-#         filtered_mask = cv2.resize(filtered_mask, (self.latest_mask.shape[1], self.latest_mask.shape[0]))
-
-#         return filtered_mask
-
-
-#     def feed_callback(self, msg:Image):
-#         """
-#         Processes video frames, applies segmentation mask, detects objects, and tracks them.
-#         """
-#         frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-
-#         # Get filtered mask (only contains the allowed classes)
-#         filtered_mask = self.filter_mask_by_class()
-
-#         # Apply the mask to the frame
-#         masked_frame = cv2.bitwise_and(frame, frame, mask=filtered_mask)
-
-#         # Perform object detection on the masked frame
-#         results = self.model(masked_frame)
-
-#         # Extract bounding boxes and confidence scores
-#         detections = []
-#         for result in results:
-#             for box in result.boxes:
-#                 x1, y1, x2, y2 = map(int, box.xyxy[0])  # Bounding box coordinates
-#                 confidence = float(box.conf[0])  # Confidence score
-#                 class_id = int(box.cls[0])  # Class ID
-
-#                 class_name = self.model.names[class_id]  # Get class name from YOLO
-#                 if class_name in self.allowed_classes:
-#                     detections.append(([x1, y1, x2, y2], confidence, class_id))
-
-#         # Update tracker with valid detections
-#         tracks = self.tracker.update_tracks(detections, frame=frame)
-
-#         # Prepare TrackedObjects message
-#         tracked_objects_msg = TrackedObjects()
-#         tracked_objects_msg.objects = []
-
-#         # Draw bounding boxes and add tracked objects to message
-#         for track in tracks:
-#             if not track.is_confirmed():
-#                 continue
-
-#             track_id = track.track_id
-#             ltrb = track.to_ltrb()
-#             class_label = self.model.names[track.det_class]  # Get class name from YOLO
-
-#             # Draw bounding box
-#             cv2.rectangle(frame, (int(ltrb[0]), int(ltrb[1])), 
-#                           (int(ltrb[2]), int(ltrb[3])), (0, 255, 0), 2)
-#             cv2.putText(frame, f'ID: {track_id} {class_label}', (int(ltrb[0]), int(ltrb[1]) - 10), 
-#                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-#             # Create TrackedObject message
-#             tracked_obj = TrackedObject()
-#             tracked_obj.id = track_id
-#             tracked_obj.class_label = class_label
-#             tracked_obj.xmin = ltrb[0]
-#             tracked_obj.ymin = ltrb[1]
-#             tracked_obj.xmax = ltrb[2]
-#             tracked_obj.ymax = ltrb[3]
-#             tracked_obj.confidence = track.det_conf
-
-#             tracked_objects_msg.objects.append(tracked_obj)
-
-#         # Publish tracked objects
-#         self.tracked_pub.publish(tracked_objects_msg)
-
-#         # Show result
-#         cv2.imshow("Tracked Objects", frame)
-#         cv2.waitKey(1)
-
-# def main(args=None):
-#     rclpy.init(args=args)
-#     node = ObjectTrackingNode()
-#     try:
-#         rclpy.spin(node)
-#     except KeyboardInterrupt:
-#         pass
-#     finally:
-#         rclpy.shutdown()
-
-# if __name__ == "__main__":
-#     main()
-
 import rclpy
 from rclpy.node import Node
 import cv2
@@ -195,7 +27,7 @@ class ObjectTrackingNode(Node):
         # Store the latest segmentation mask
         self.latest_mask = None
 
-        # Define the color map (RGB values) and corresponding class labels
+        # Define the color map and corresponding class labels
         self.class_map = {
             (0, 0, 0): "Background",
             (128, 0, 0): "Aeroplane",
@@ -254,7 +86,7 @@ class ObjectTrackingNode(Node):
                 x, y, w, h = cv2.boundingRect(contour)
                 area = w * h
 
-                if area > 800:  # Ignore small noise
+                if area > 20000:  # Ignore small noise
                     detected_objects.append(([x, y, x + w, y + h], 1.0, class_label))
 
         return detected_objects
@@ -279,6 +111,10 @@ class ObjectTrackingNode(Node):
         tracked_objects_msg = TrackedObjects()
         tracked_objects_msg.objects = []
 
+        # ID remapping for sequential numbering
+        id_map = {}  # Dictionary to store remapped IDs
+        next_id = 1  # Start numbering from 1
+
         for track in tracks:
             if not track.is_confirmed():
                 continue
@@ -287,7 +123,14 @@ class ObjectTrackingNode(Node):
             ltrb = track.to_ltrb()
             class_label = track.det_class
 
-            self.get_logger().info(f"📦 Tracking ID {track_id}: {ltrb} -> {class_label}")
+            # Assign new sequential ID if it's not already assigned
+            if track_id not in id_map:
+                id_map[track_id] = next_id
+                next_id += 1  # Increment for the next object
+
+            new_id = id_map[track_id]
+
+            self.get_logger().info(f"📦 Tracking ID {new_id}: {ltrb} -> {class_label}")
 
             x_min, y_min, x_max, y_max = map(int, ltrb)
             x_min = max(0, x_min)
@@ -295,30 +138,36 @@ class ObjectTrackingNode(Node):
             x_max = min(frame.shape[1] - 1, x_max)
             y_max = min(frame.shape[0] - 1, y_max)
 
+            # Ignore small detections (noise filtering)
+            min_area = 20000  # Adjust as needed
+            if (x_max - x_min) * (y_max - y_min) < min_area:
+                continue  # Skip small detections
+
             # Get the correct color for this class
             bbox_color = tuple(self.class_colors[self.class_labels.index(class_label)])
-            bbox_color = tuple(map(int, bbox_color))  # Ensure it's a proper BGR tuple for OpenCV
+            bbox_color = tuple(map(int, bbox_color))  # Ensure it's a valid BGR tuple
 
             # Draw bounding box with the correct class color
             cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), bbox_color, 3)
-            cv2.putText(frame, f'ID: {track_id} {class_label}', (x_min, y_min - 10),
+            cv2.putText(frame, f'ID: {new_id} {class_label}', (x_min, y_min - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, bbox_color, 3)
 
-        #     # Create TrackedObject message
-        #     tracked_obj = TrackedObject()
-        #     tracked_obj.id = track_id
-        #     tracked_obj.class_label = class_label
-        #     tracked_obj.xmin = float(x_min)
-        #     tracked_obj.ymin = float(y_min)
-        #     tracked_obj.xmax = float(x_max)
-        #     tracked_obj.ymax = float(y_max)
+            # Create TrackedObject message
+            tracked_obj = TrackedObject()
+            tracked_obj.id = int(new_id)
+            tracked_obj.class_label = class_label
+            tracked_obj.xmin = float(x_min)
+            tracked_obj.ymin = float(y_min)
+            tracked_obj.xmax = float(x_max)
+            tracked_obj.ymax = float(y_max)
 
-        #     tracked_objects_msg.objects.append(tracked_obj)
+            tracked_objects_msg.objects.append(tracked_obj)
 
-        # self.tracked_pub.publish(tracked_objects_msg)
+        self.tracked_pub.publish(tracked_objects_msg)
 
         cv2.imshow("tracked_output", frame)
         cv2.waitKey(1)
+
 
 def main(args=None):
     rclpy.init(args=args)

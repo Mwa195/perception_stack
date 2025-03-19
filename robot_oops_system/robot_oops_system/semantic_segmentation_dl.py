@@ -11,18 +11,40 @@ import torchvision.models as models
 from torchvision import transforms
 
 class SegmentationNode(Node):
+    """
+    Semantic Segmentation Node which subscribes to the /camera_feed topic
+    and performs semantic segmentation on the feed to identify objects
+    according to VOC 20 then publish the result to /segmentation_mask
+    """
     def __init__(self):
+        """
+        Initialize the segmentation_node
+        """
         super().__init__("segmentation_node")
 
-        self.feed_sub = self.create_subscription(Image, "/camera_feed", self.feed_callback, 10)
-        self.mask_pub = self.create_publisher(Image, "/segmentation_mask", 10)
+        # Subscriber
+        self.feed_sub = self.create_subscription(
+            Image,
+            "/camera_feed",
+            self.feed_callback,
+            10
+            )
+        
+        # Publisher
+        self.mask_pub = self.create_publisher(
+            Image,
+            "/segmentation_mask",
+            10
+            )
+        
+        # CV Bridge (Used to convert the frames into ROS2 msg *Image*)
         self.bridge = CvBridge()
 
-        # Load the pre-trained DeepLabV3 model with ResNet101 backbone
+        # Load the pre-trained DeepLabV3 model ResNet101
         self.model = models.segmentation.deeplabv3_resnet101(pretrained=True)
-        self.model.eval()  # Set the model to evaluation mode
+        self.model.eval()
 
-        # Move the model to GPU if available
+        # Move the model to GPU
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
 
@@ -35,7 +57,12 @@ class SegmentationNode(Node):
         self.get_logger().info("DeepLabV3+ Segmentation Node started.")
 
     def feed_callback(self, msg: Image):
-        # Convert ROS Image message to OpenCV format
+        """
+        Feed callback function which is executed whenever the node receives a
+        msg from the /camera_feed topic in order to process the frame and
+        create the segmentation mask
+        """
+        # Convert ROS2 Image msg to OpenCV format
         frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
 
         # Preprocess the image
@@ -53,14 +80,19 @@ class SegmentationNode(Node):
         # Apply a color map to the mask
         mask_colored = self.apply_color_map(mask)
 
-        # Display the result
+        # Display the results
         cv2.imshow("DeepLabV3+ Segmentation", mask_colored)
+        # COnvert frame to Image format
         mask_msg = self.bridge.cv2_to_imgmsg(mask_colored, encoding="bgr8")
+        # Publish the results
         self.mask_pub.publish(mask_msg)
         cv2.waitKey(1)  # Required for OpenCV to update the window
 
     def apply_color_map(self, mask):
-        """Apply a color map to the segmentation mask."""
+        """
+        Apply a color map to the segmentation mask in order to differentiate
+        between detected classes
+        """
         # Pascal VOC color map (21 classes)
         colors = [
             [0, 0, 0],       # Background
@@ -112,6 +144,7 @@ class SegmentationNode(Node):
         for i in range(21):  # Loop over all classes
             colored_mask[mask == i] = colors[i]
         
+        # # Log detected classes
         # detected_classes = set(mask.flatten()) 
         # for i in detected_classes:
         #     if i > 0:  # Ignore background (0)
@@ -120,14 +153,14 @@ class SegmentationNode(Node):
         return colored_mask
 
 def main(args=None):
-    rclpy.init(args=args)
-    node = SegmentationNode()
+    rclpy.init(args=args) # Initialize ROS2
+    node = SegmentationNode() # Create Node as an instance of the Class
     try:
-        rclpy.spin(node)
+        rclpy.spin(node) # Keep the node spinning
     except KeyboardInterrupt:
         pass
     finally:
-        rclpy.shutdown()
+        rclpy.shutdown() # Shutdown the node gracefully
 
 if __name__ == "__main__":
     main()
