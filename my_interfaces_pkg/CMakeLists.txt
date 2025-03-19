@@ -29,6 +29,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 "msg/Ticks.msg"
 "msg/TrackedObject.msg"
 "msg/TrackedObjects.msg"
+"msg/ObjectData.msg"
+"msg/ObjectsData.msg"
 "srv/StartMission.srv"
 "srv/CreatePlan.srv" 
 "action/CountUntil.action"
