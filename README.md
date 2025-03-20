@@ -56,7 +56,7 @@ pip install torch torchvision torchaudio deepsort-realtime
 ### **2️⃣ Clone the Repository**
 ```bash
 cd ~/ros2_ws/src  # Navigate to your workspace
-git clone https://github.com/yourusername/robot_oops_system.git
+git clone https://github.com/Mwa195/perception_stack.git
 cd .. && colcon build --symlink-install
 source install/setup.bash
 ```
