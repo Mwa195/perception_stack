@@ -1,4 +1,3 @@
-# Import Necessary Libraries
 import rclpy
 from rclpy.node import Node
 import cv2
@@ -7,7 +6,7 @@ from cv_bridge import CvBridge
 
 class CameraStreamer(Node):
     """
-    Camera Streamer Node which captures frames from the laptop's webcam
+    Camera Streamer Node: captures frames from the laptop's webcam
     and publishes it to /camera_feed topic
     """
     def __init__(self):
@@ -22,6 +21,12 @@ class CameraStreamer(Node):
             self.get_logger().error("Camera didn't Open")
             return
         
+        # CV Bridge (Used to convert the frames into ROS2 msg *Image*)
+        self.bridge = CvBridge()
+
+        # Main Timer which captures the frames with 30 FPS
+        self.main_timer = self.create_timer(1/30, self._stream_video)
+
         # Publisher
         self.feed_pub = self.create_publisher(
             Image,
@@ -29,15 +34,9 @@ class CameraStreamer(Node):
             10
             )
         
-        # CV Bridge (Used to convert the frames into ROS2 msg *Image*)
-        self.bridge = CvBridge()
+        self.get_logger().info("Camera Streamer Node has started ✅")
 
-        # Main Timer which captures the frames with 30 FPS
-        self.main_timer = self.create_timer(1/30, self.stream_video)
-        
-        self.get_logger().info("Camera Streamer Node has started.")
-
-    def stream_video(self):
+    def _stream_video(self):
         """
         Continuously capture and display frames from the webcam
         """
@@ -51,8 +50,7 @@ class CameraStreamer(Node):
         else:
             self.get_logger().warn("Failed to capture frame")
         
-
-        # Use 'e' to exit
+        # Prees e to exit
         if cv2.waitKey(1) & 0xFF == ord('e'):
             self.get_logger().info("Shutting down camera stream...")
             self.cap.release()

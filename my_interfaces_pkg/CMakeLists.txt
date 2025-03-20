@@ -29,6 +29,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 "msg/Ticks.msg"
 "msg/TrackedObject.msg"
 "msg/TrackedObjects.msg"
+"msg/ObjectSpeed.msg"
+"msg/ObjectsSpeeds.msg"
 "msg/ObjectData.msg"
 "msg/ObjectsData.msg"
 "srv/StartMission.srv"

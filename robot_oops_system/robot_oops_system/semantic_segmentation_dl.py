@@ -1,5 +1,3 @@
-#! /home/mwa/opencv_env/bin/python3
-
 import rclpy
 from rclpy.node import Node
 import cv2
@@ -12,7 +10,7 @@ from torchvision import transforms
 
 class SegmentationNode(Node):
     """
-    Semantic Segmentation Node which subscribes to the /camera_feed topic
+    Semantic Segmentation Node: subscribes to the /camera_feed topic
     and performs semantic segmentation on the feed to identify objects
     according to VOC 20 then publish the result to /segmentation_mask
     """
@@ -21,21 +19,6 @@ class SegmentationNode(Node):
         Initialize the segmentation_node
         """
         super().__init__("segmentation_node")
-
-        # Subscriber
-        self.feed_sub = self.create_subscription(
-            Image,
-            "/camera_feed",
-            self.feed_callback,
-            10
-            )
-        
-        # Publisher
-        self.mask_pub = self.create_publisher(
-            Image,
-            "/segmentation_mask",
-            10
-            )
         
         # CV Bridge (Used to convert the frames into ROS2 msg *Image*)
         self.bridge = CvBridge()
@@ -54,9 +37,24 @@ class SegmentationNode(Node):
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),  # Normalize
         ])
 
-        self.get_logger().info("DeepLabV3+ Segmentation Node started.")
+        # Subscriber
+        self.feed_sub = self.create_subscription(
+            Image,
+            "/camera_feed",
+            self._feed_callback,
+            10
+            )
+        
+        # Publisher
+        self.mask_pub = self.create_publisher(
+            Image,
+            "/segmentation_mask",
+            10
+            )
+        
+        self.get_logger().info("DeepLabV3+ Segmentation Node started ✅")
 
-    def feed_callback(self, msg: Image):
+    def _feed_callback(self, msg: Image):
         """
         Feed callback function which is executed whenever the node receives a
         msg from the /camera_feed topic in order to process the frame and
@@ -78,7 +76,7 @@ class SegmentationNode(Node):
         mask = output_predictions.byte().cpu().numpy()
 
         # Apply a color map to the mask
-        mask_colored = self.apply_color_map(mask)
+        mask_colored = self._apply_color_map(mask)
 
         # Display the results
         cv2.imshow("DeepLabV3+ Segmentation", mask_colored)
@@ -88,7 +86,7 @@ class SegmentationNode(Node):
         self.mask_pub.publish(mask_msg)
         cv2.waitKey(1)  # Required for OpenCV to update the window
 
-    def apply_color_map(self, mask):
+    def _apply_color_map(self, mask):
         """
         Apply a color map to the segmentation mask in order to differentiate
         between detected classes
@@ -117,40 +115,12 @@ class SegmentationNode(Node):
             [128, 192, 0],   # Train
             [0, 64, 128]     # TV/Monitor
         ]
-        classes_names = [
-            "Background",       # Background
-            "Aeroplane",     # Aeroplane
-            "Bicycle",     # Bicycle
-            "Bird",   # Bird
-            "Boat",     # Boat
-            "Bottle",   # Bottle
-            "Bus",   # Bus
-            "Car", # Car
-            "Cat",      # Cat
-            "Chair",     # Chair
-            "Cow",    # Cow
-            "Dining Table",   # Dining Table
-            "Dog",    # Dog
-            "Horse",   # Horse
-            "Motorbike",  # Motorbike
-            "Person", # Person
-            "Potted Plant",      # Potted Plant
-            "Sheep",    # Sheep
-            "Sofa",     # Sofa
-            "Train",   # Train
-            "Monitor"     # TV/Monitor
-        ]
         colored_mask = np.zeros((mask.shape[0], mask.shape[1], 3), dtype=np.uint8)
         for i in range(21):  # Loop over all classes
             colored_mask[mask == i] = colors[i]
-        
-        # # Log detected classes
-        # detected_classes = set(mask.flatten()) 
-        # for i in detected_classes:
-        #     if i > 0:  # Ignore background (0)
-        #         self.get_logger().info(f"Detected {classes_names[i]}/s")
                 
         return colored_mask
+
 
 def main(args=None):
     rclpy.init(args=args) # Initialize ROS2
