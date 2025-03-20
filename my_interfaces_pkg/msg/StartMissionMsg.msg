@@ -1,0 +1,2 @@
+string mission_name
+geometry_msgs/Pose target_pose
