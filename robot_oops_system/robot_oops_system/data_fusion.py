@@ -14,7 +14,7 @@ class FusionNode(Node):
         """
         super().__init__("data_fusion_node")
 
-        self.timer = self.create_timer(1/30, self._objects_list_publisher)
+        self.timer = self.create_timer(1/10, self._objects_list_publisher)
         self.objects_from_tracker = []
         self.objects_from_optical_flow = []
 

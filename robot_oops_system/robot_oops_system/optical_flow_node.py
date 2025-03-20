@@ -119,15 +119,18 @@ class OpticalFlowNode(Node):
                 # Create ObjectData message
                 object_data = ObjectSpeed()
                 object_data.id = obj_id
-                object_data.speed_kmh = avg_speed
+                if avg_speed >= 0.8:
+                    object_data.speed_kmh = avg_speed
+                else:
+                    object_data.speed_kmh = 0.0
 
                 tracked_speeds_msg.objects.append(object_data)
 
-                self.get_logger().info(f"📦 Object {obj_id}: Speed = {avg_speed:.2f} km/h")
+                self.get_logger().info(f"📦 Object {obj_id}: Speed = {object_data.speed_kmh} km/h")
 
         # Update previous frame
         self.prev_gray = gray.copy()
-        
+
         # Publish
         self.speed_pub.publish(tracked_speeds_msg)
 
